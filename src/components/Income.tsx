@@ -62,7 +62,7 @@ export function IncomeChip({ contracts }: { contracts: Contract[] }) {
       data-open={open}
       animate={{
         width: open ? wide : closedW,
-        height: open ? "auto" : 36,
+        height: open ? "auto" : 42,
         borderRadius: open ? 22 : 999,
       }}
       transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.9 }}

@@ -11,15 +11,18 @@ export function Seg<V extends string | number>({
   onChange,
   name,
   wide,
+  small,
 }: {
   value: V;
   options: { v: V; label: React.ReactNode }[];
   onChange: (v: V) => void;
   name: string;
   wide?: boolean;
+  /** компактный вариант — для шапки карточки */
+  small?: boolean;
 }) {
   return (
-    <div className={`seg seg--lg${wide ? " seg--full" : ""}`}>
+    <div className={`seg ${small ? "seg--sm" : "seg--lg"}${wide ? " seg--full" : ""}`}>
       {options.map((o) => (
         <button key={o.v} data-on={o.v === value} onClick={() => onChange(o.v)} aria-label={String(o.v)}>
           {o.v === value && (

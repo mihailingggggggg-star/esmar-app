@@ -1,5 +1,13 @@
-import type { LucideIcon } from "lucide-react";
-import { ArrowUpRight } from "lucide-react";
+
+import { ArrowUpRight, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight as PhArrowUpRight,
+  ChartLineUp,
+  FileText,
+  HandCoins,
+} from "@phosphor-icons/react";
+import type { EventKind } from "../lib/feed";
 import { MarkEsmar } from "./Logo";
 
 /**
@@ -65,25 +73,39 @@ export function ActionChip({
 }
 
 /** Строка операции: иконка, название, дата, сумма. */
+/**
+ * Иконки операций — Phosphor Icons (github.com/phosphor-icons/react, MIT),
+ * начертание fill: на 18px читаются плотнее и «материальнее», чем тонкие
+ * штриховые глифы. Набор готовый, своих путей не рисуем.
+ */
+const TX_ICON = {
+  sign: FileText,
+  accrual: ChartLineUp,
+  payout: HandCoins,
+  topup: ArrowDownLeft,
+  terminate: PhArrowUpRight,
+} as const;
+
 export function TxRow({
-  icon: Icon,
+  kind,
   title,
   sub,
   amount,
   tone,
   onClick,
 }: {
-  icon: LucideIcon;
+  kind: EventKind;
   title: string;
   sub: string;
   amount: string;
   tone?: "up" | "down";
   onClick?: () => void;
 }) {
+  const Icon = TX_ICON[kind];
   return (
     <button className="tx" onClick={onClick} type="button">
       <span className="tx__i" data-tone={tone}>
-        <Icon size={15} strokeWidth={2.1} />
+        <Icon size={18} weight="fill" />
       </span>
       <span className="tx__b">
         <span className="tx__t">{title}</span>

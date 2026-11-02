@@ -34,7 +34,7 @@
   --surface-2: #171c10;
   --on: rgba(255, 255, 255, 0.96);
   --on-2: rgba(255, 255, 255, 0.62);
-  --on-3: rgba(255, 255, 255, 0.4);
+  --on-3: rgba(255, 255, 255, 0.52);
 
   --card: rgba(255, 255, 255, 0.06);
   --card-2: rgba(255, 255, 255, 0.1);
@@ -70,7 +70,7 @@
   --surface-2: #ffffff;
   --on: #171a12;
   --on-2: rgba(23, 26, 18, 0.64);
-  --on-3: rgba(23, 26, 18, 0.42);
+  --on-3: rgba(23, 26, 18, 0.62);
 
   --card: #ffffff;
   --card-2: #ffffff;
@@ -526,6 +526,10 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  /* высота под палец, без визуального жира: отступы уходят в поле нажатия */
+  min-height: 32px;
+  padding: 0 2px;
+  margin: -8px -2px -8px 0;
   font-size: 12.5px;
   font-weight: 500;
   color: var(--on-3);
@@ -1688,7 +1692,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
 .cat__search input::placeholder { color: var(--on-3); }
 .cat__filter {
   flex-shrink: 0;
-  width: 36px; height: 36px;
+  width: 40px; height: 40px;
   border-radius: 12px;
   display: grid;
   place-items: center;
@@ -1700,7 +1704,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
 .cat__filter[data-on="true"] { color: var(--fill-txt); background: var(--fill); border-color: transparent; }
 
 .pills--cat { padding-bottom: 2px; }
-.pills--cat .pill { padding: 8px 14px; }
+.pills--cat .pill { padding: 10px 14px; }
 
 .cat__head {
   display: flex;
@@ -1852,7 +1856,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   text-overflow: ellipsis;
 }
 .an__round {
-  width: 38px; height: 38px;
+  width: 40px; height: 40px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -1878,6 +1882,9 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-height: 36px;
+  padding: 0 2px;
+  margin: -8px -2px -8px 0;
   font-size: 12px;
   font-weight: 500;
   color: var(--on-3);
@@ -1915,77 +1922,6 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
 .an__leg-n { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .an__leg b { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--on); }
 
-/* карточка «примерный доход»: период выбирается сегментом, значения
-   год / месяц / день показаны одновременно и всегда сходятся */
-.an__income {
-  margin: 18px var(--gut) 0;
-  padding: 13px 14px 12px;
-  border-radius: 20px;
-  border: 1px solid color-mix(in srgb, var(--up) 22%, transparent);
-  background:
-    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--up) 16%, transparent) 0%, transparent 58%),
-    var(--card);
-}
-
-.an__income-h { display: flex; align-items: center; gap: 8px; }
-.an__income-i {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--up);
-  background: color-mix(in srgb, var(--up) 14%, transparent);
-}
-.an__income-k {
-  flex: 1;
-  min-width: 0;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--on-2);
-}
-
-.an__income-seg {
-  display: flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--fill-2);
-}
-.an__income-seg button {
-  padding: 5px 9px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  font: inherit;
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--on-3);
-  transition: background 0.18s ease, color 0.18s ease;
-}
-.an__income-seg button[data-on="true"] {
-  color: var(--surface);
-  background: var(--up);
-}
-
-.an__income-v { display: flex; align-items: baseline; gap: 6px; margin-top: 10px; }
-.an__income-v b { font-size: 30px; font-weight: 800; letter-spacing: -0.035em; }
-.an__income-v i { font-size: 12px; font-style: normal; font-weight: 500; color: var(--on-2); }
-
-.an__income-f {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 9px;
-  padding-top: 9px;
-  border-top: 1px solid var(--hair);
-  font-size: 10.5px;
-  color: var(--on-2);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.an__income-sep { width: 3px; height: 3px; border-radius: 50%; background: var(--on-3); flex-shrink: 0; }
-.an__income-note { margin-top: 7px; font-size: 10px; color: var(--on-3); }
-
 .an__bars { position: relative; height: 172px; margin: 0 var(--gut); }
 .an__tip {
   position: absolute;
@@ -2016,7 +1952,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 34px;
+  height: 40px;
   padding: 0 13px;
   border-radius: 999px;
   font-size: 12.5px;
@@ -2039,7 +1975,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   position: relative;
   display: grid;
   place-items: center;
-  width: 34px; height: 34px;
+  width: 40px; height: 40px;
   border-radius: 50%;
   color: var(--on-2);
 }
@@ -2065,7 +2001,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
 .pf__add {
   display: grid;
   place-items: center;
-  width: 30px; height: 30px;
+  width: 40px; height: 40px;
   margin-left: 2px;
   border-radius: 50%;
   color: #fff;
@@ -2481,7 +2417,9 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin: 6px auto 0;
+  min-height: 40px;
+  margin: 0 auto;
+  padding: 0 8px;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--brand-lit);
@@ -2550,7 +2488,9 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  margin-top: 16px;
+  min-height: 40px;
+  margin-top: 8px;
+  padding: 0 2px;
   font-size: 12px;
   font-weight: 600;
   color: var(--brand-lit);
@@ -2594,7 +2534,6 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
     white-space: normal;
     line-height: 1.18;
     text-wrap: balance;
-    hyphens: auto;
     overflow: visible;
     text-overflow: clip;
   }
@@ -2779,7 +2718,9 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 0;
+  min-height: 40px;
+  padding: 0 2px;
+  margin: -11px -2px -11px 0;
   border: 0;
   background: none;
   font: inherit;
@@ -2804,14 +2745,24 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   gap: 6px;
 }
 .ctr__dots button {
-  width: 6px; height: 6px;
+  position: relative;
+  width: 16px; height: 24px;
   padding: 0;
   border: 0;
+  background: none;
+}
+.ctr__dots button::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 6px; height: 6px;
+  transform: translate(-50%, -50%);
   border-radius: 999px;
   background: color-mix(in srgb, var(--on) 22%, transparent);
   transition: width 0.2s ease, background 0.2s ease;
 }
-.ctr__dots button[data-on="true"] {
+.ctr__dots button[data-on="true"] { width: 26px; }
+.ctr__dots button[data-on="true"]::before {
   width: 18px;
   background: var(--brand-lit);
 }
@@ -2820,7 +2771,9 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  padding: 0;
+  min-height: 32px;
+  padding: 0 2px;
+  margin: -5px -2px -5px 0;
   border: 0;
   background: none;
   font: inherit;
@@ -2862,7 +2815,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   justify-content: center;
   gap: 7px;
   width: 100%;
-  height: 36px;
+  height: 42px;
   padding: 0 13px;
   border: 0;
   background: none;
@@ -2881,7 +2834,7 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 36px;
+  height: 42px;
   padding: 0 13px;
   visibility: hidden;
   pointer-events: none;
@@ -2959,4 +2912,81 @@ input { font: inherit; color: inherit; border: 0; background: none; outline: non
   .an__income-seg { order: 3; flex: 1 0 100%; margin-top: 8px; justify-content: space-between; }
   .an__income-seg button { flex: 1; }
   .an__income-v b { font-size: 26px; }
+}
+
+/* ---------------------------------------------------------- карточка ----- */
+/* Базовый блок в духе shadcn/ui Card: рамка, ровные отступы, шапка,
+   «тело» и подвал с разделителями. Никаких градиентов и свечений. */
+
+.card {
+  margin: 18px var(--gut) 0;
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 13px 0;
+}
+.card__k { font-size: 12px; font-weight: 600; color: var(--on-2); }
+
+.card__main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 7px 13px 11px;
+}
+.card__main b { font-size: 29px; font-weight: 800; letter-spacing: -0.035em; }
+.card__main span { font-size: 12px; color: var(--on-2); }
+
+.card__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--hair);
+}
+.card__grid > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 13px;
+}
+.card__grid > div + div { border-left: 1px solid var(--hair); }
+.card__grid dt { font-size: 10px; color: var(--on-3); }
+.card__grid dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 13px 9px;
+  border-top: 1px solid var(--hair);
+  font-size: 10.5px;
+  color: var(--on-3);
+}
+
+/* компактный сегмент — для шапки карточки */
+.seg--sm { padding: 2px; }
+.seg--sm button {
+  min-width: 40px;
+  min-height: 36px;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+/* на узких экранах сегмент периода в карточке уходит на свою строку */
+@media (max-width: 360px) {
+  .an__income .card__top { flex-wrap: wrap; }
+  .an__income .seg { width: 100%; }
+  .an__income .seg button { flex: 1; }
 }

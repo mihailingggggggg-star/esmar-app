@@ -7,13 +7,11 @@ import {
   ArrowUpRight,
   Bookmark,
   Coins,
-  FileSignature,
   Flame,
   MapPin,
   ShieldCheck,
   Sparkles,
   Timer,
-  TrendingUp,
   X,
 } from "lucide-react";
 import { assets, news, ui, type Asset as Obj } from "../lib/data";
@@ -24,14 +22,6 @@ import { HeroBg } from "../components/Hero";
 import { AccountIsland } from "../components/Island";
 import { ContractsRail } from "../components/ContractsRail";
 import { IncomeChip } from "../components/Income";
-
-const ICONS = {
-  sign: FileSignature,
-  accrual: TrendingUp,
-  payout: Coins,
-  topup: ArrowDownLeft,
-  terminate: ArrowUpRight,
-} as const;
 
 /** Бейджи-метки карточек: финальная стадия, популярность, выбор инвесторов. */
 type Mark = "final" | "popular" | "choice" | "mine";
@@ -335,7 +325,7 @@ export function Home({
           {events.slice(0, 4).map((e: Event) => (
             <TxRow
               key={e.id}
-              icon={ICONS[e.kind]}
+              kind={e.kind}
               title={e.title[lang]}
               sub={`${e.sub[lang]} · ${eventDate(e.date, lang)}`}
               amount={`${e.amount > 0 ? "+" : "−"}${money(Math.abs(e.amount))}`}

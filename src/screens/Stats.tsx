@@ -5,7 +5,6 @@ import {
   CalendarDays,
   ChevronDown,
   Lock,
-  Sprout,
 } from "lucide-react";
 import {
   Bar,
@@ -263,54 +262,52 @@ export function Stats({ onKyc, onBack }: { onKyc: () => void; onBack: () => void
       </div>
 
       <motion.div
-        className="an__income"
+        className="card an__income"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="an__income-h">
-          <span className="an__income-i">
-            <Sprout size={17} strokeWidth={2} />
-          </span>
-          <span className="an__income-k">{t(ui.incomeApprox)}</span>
-          <div className="an__income-seg" role="tablist" aria-label={t(ui.incomeApprox)}>
-            {(["year", "month", "day"] as IncomePeriod[]).map((p) => (
-              <button
-                key={p}
-                type="button"
-                role="tab"
-                aria-selected={p === incomePeriod}
-                data-on={p === incomePeriod}
-                onClick={() => setIncomePeriod(p)}
-              >
-                {p === "year" ? t(ui.perYearShort) : p === "month" ? t(ui.perMonthShort) : t(ui.perDayShort)}
-              </button>
-            ))}
-          </div>
+        <div className="card__top">
+          <span className="card__k">{t(ui.incomeApprox)}</span>
+          <Seg
+            name="an-income"
+            small
+            value={incomePeriod}
+            onChange={setIncomePeriod}
+            options={[
+              { v: "year" as IncomePeriod, label: t(ui.perYearShort) },
+              { v: "month" as IncomePeriod, label: t(ui.perMonthShort) },
+              { v: "day" as IncomePeriod, label: t(ui.perDayShort) },
+            ]}
+          />
         </div>
 
-        <div className="an__income-v">
+        <div className="card__main">
           <b className="tnum">{money(income[incomePeriod], incomePeriod === "day" ? 2 : 0)}</b>
-          <i>{incomeLabel[incomePeriod]}</i>
+          <span>{incomeLabel[incomePeriod]}</span>
         </div>
 
-        <div className="an__income-f">
-          <span className="tnum">
-            {money(income.year)} {t(ui.inYear)}
-          </span>
-          <span className="an__income-sep" aria-hidden />
-          <span className="tnum">
-            {money(income.month)} {t(ui.anPerMonth)}
-          </span>
-          <span className="an__income-sep" aria-hidden />
-          <span className="tnum">
-            {money(income.day, 2)} {t(ui.inDay)}
-          </span>
-        </div>
+        <dl className="card__grid">
+          <div>
+            <dt>{t(ui.inYear)}</dt>
+            <dd className="tnum">{money(income.year)}</dd>
+          </div>
+          <div>
+            <dt>{t(ui.anPerMonth)}</dt>
+            <dd className="tnum">{money(income.month)}</dd>
+          </div>
+          <div>
+            <dt>{t(ui.inDay)}</dt>
+            <dd className="tnum">{money(income.day, 2)}</dd>
+          </div>
+        </dl>
 
-        <p className="an__income-note">
-          {fixed(avgRate)}% {t(ui.perYear)} · {contractsWordCount}
-        </p>
+        <div className="card__foot">
+          <span className="tnum">
+            {fixed(avgRate)}% {t(ui.perYear)}
+          </span>
+          <span>{contractsWordCount}</span>
+        </div>
       </motion.div>
 
       <div className="an__head">
