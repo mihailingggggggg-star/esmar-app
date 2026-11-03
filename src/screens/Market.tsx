@@ -1,170 +1,139 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Check,
-  MapPin,
-  Search,
-  ShieldCheck,
-  SlidersHorizontal,
-  TrendingUp,
-} from "lucide-react";
-import { assets, products, ui, type ProductId } from "../lib/data";
-import { useApp, useT } from "../lib/app";
-
-type Filter = "all" | ProductId;
+import { Check, MapPin, Search, SlidersHorizontal, TrendingUp } from "lucide-react";
+import { api } from "../api/client";
+import { useQuery } from "../api/hooks";
+import type { ObjectItem } from "../api/types";
+import { money, useApp, useT } from "../lib/app";
+import { ui } from "../lib/data";
+import { EmptyState, ErrorState, Loading } from "../components/kit";
 
 /**
- * Каталог 1:1 по референсу: крупный двухстрочный заголовок, круглая кнопка
- * профиля справа, поиск с иконкой фильтра, ряд чипов-категорий, заголовок
- * секции и сетка фото-карточек 2×N с ценой, прогрессом, названием и адресом.
- * Иконки — lucide-react, анимации появления — framer-motion.
+ * Каталог: поиск, фильтр «только с открытым сбором», чипы продуктов и сетка
+ * карточек. Ставка в карточке — расчётная на сегодня (её считает бэкенд),
+ * поэтому у девелопмента она снижается по мере приближения сдачи.
  */
-export function Market({
-  onAsset,
-  onProfile,
-}: {
-  onAsset: (id: string) => void;
-  onProfile: () => void;
-}) {
+export function Market({ onAsset, onProfile }: { onAsset: (id: string) => void; onProfile: () => void }) {
   const t = useT();
-  const { lang, user } = useApp();
-  const [mode, setMode] = useState<Filter>("all");
-  const [q, setQ] = useState("");
+  const { lang, products } = useApp();
+  const [query, setQuery] = useState("");
   const [openOnly, setOpenOnly] = useState(false);
+  const [product, setProduct] = useState<string>("all");
+
+  const { data, loading, error, reload } = useQuery(() => api.getObjects(), []);
+  const objects = data ?? [];
 
   const list = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    return assets
-      .filter((a) => mode === "all" || a.product === mode || a.extra?.includes(mode))
-      .filter((a) => !openOnly || a.raised / a.target < 0.95)
-      .filter(
-        (a) =>
-          !term ||
-          a.name[lang].toLowerCase().includes(term) ||
-          a.address[lang].toLowerCase().includes(term) ||
-          a.city[lang].toLowerCase().includes(term) ||
-          a.kind[lang].toLowerCase().includes(term) ||
-          products[a.product].name[lang].toLowerCase().includes(term)
-      )
-      /* Сначала объекты, где финансирование ещё открыто. */
-      .sort((a, b) => a.raised / a.target - b.raised / b.target);
-  }, [mode, q, openOnly, lang]);
-
-  const filters: { id: Filter; label: string }[] = [
-    { id: "all", label: t(ui.all) },
-    ...Object.values(products).map((p) => ({ id: p.id as Filter, label: p.name[lang] })),
-  ];
-
-  const initials = user
-    ? user.name
-        .split(" ")
-        .filter(Boolean)
-        .map((w) => w[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "";
+    const q = query.trim().toLowerCase();
+    return objects.filter((o) => {
+      if (openOnly && o.status !== "open") return false;
+      if (product !== "all" && o.product !== product && !(o.extra ?? []).includes(product as never)) return false;
+      if (!q) return true;
+      return (
+        o.name[lang].toLowerCase().includes(q) ||
+        o.city[lang].toLowerCase().includes(q) ||
+        o.address[lang].toLowerCase().includes(q) ||
+        (products[o.product]?.name[lang] ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [objects, query, openOnly, product, lang, products]);
 
   return (
     <div className="screen">
-      <header className="cat__top">
-        <h1 className="cat__title">
-          {t(ui.catTitle1)}
-          <br />
-          {t(ui.catTitle2)}
-        </h1>
+      <div className="cat__top">
+        <div>
+          <h1 className="cat__t1">{t(ui.catTitle1)}</h1>
+          <h1 className="cat__t2">{t(ui.catTitle2)}</h1>
+        </div>
         <button className="cat__ava" onClick={onProfile} type="button" aria-label={t(ui.tabProfile)}>
-          {user ? initials : <ShieldCheck size={19} strokeWidth={2} />}
+          {t(ui.catAva)}
         </button>
-      </header>
+      </div>
 
       <div className="cat__search">
-        <Search size={19} strokeWidth={2} aria-hidden />
+        <span className="cat__search-i">
+          <Search size={17} strokeWidth={2.2} />
+        </span>
         <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder={t(ui.searchShort)}
-          inputMode="search"
-          aria-label={t(ui.search)}
+          aria-label={t(ui.searchShort)}
         />
         <button
           className="cat__filter"
-          type="button"
           data-on={openOnly}
           onClick={() => setOpenOnly((v) => !v)}
-          aria-pressed={openOnly}
           aria-label={t(ui.catOpenOnly)}
+          aria-pressed={openOnly}
+          type="button"
         >
-          <SlidersHorizontal size={17} strokeWidth={2} />
+          <SlidersHorizontal size={16} strokeWidth={2.2} />
         </button>
       </div>
 
       <div className="pills pills--cat">
-        {filters.map((f) => (
-          <button key={f.id} className="pill" data-on={mode === f.id} onClick={() => setMode(f.id)} type="button">
-            {f.label}
+        <button className="pill" data-on={product === "all"} onClick={() => setProduct("all")} type="button">
+          {t(ui.catAll)}
+        </button>
+        {Object.values(products).map((p) => (
+          <button
+            key={p.id}
+            className="pill"
+            data-on={product === p.id}
+            onClick={() => setProduct(p.id)}
+            type="button"
+          >
+            {t(p.name)}
           </button>
         ))}
       </div>
 
       <div className="cat__head">
-        <h2>{t(ui.catNearby)}</h2>
+        <h2>{openOnly ? t(ui.catOpenOnly) : t(ui.catAvailable)}</h2>
         <span className="cat__count tnum">{list.length}</span>
       </div>
 
-      <div className="cat__grid">
-        {list.map((a, i) => (
-          <motion.button
-            key={a.id}
-            className="pcard"
-            type="button"
-            onClick={() => onAsset(a.id)}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: Math.min(i, 6) * 0.04, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <img src={`${import.meta.env.BASE_URL}obj/${a.img}`} alt="" loading="lazy" />
-            <span className="pcard__shade" aria-hidden />
+      {loading && <Loading />}
+      {error && <ErrorState error={error} onRetry={reload} />}
+      {!loading && !error && list.length === 0 && <EmptyState title={t(ui.catEmpty)} hint={t(ui.catEmptyHint)} />}
 
-            <span className="pcard__check" aria-label={t(ui.verified)}>
+      <div className="cat__grid">
+        {list.map((o, i) => (
+          <motion.button
+            key={o.id}
+            className="pcard"
+            onClick={() => onAsset(o.id)}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: Math.min(i, 6) * 0.03, ease: [0.22, 1, 0.36, 1] }}
+            type="button"
+          >
+            <img className="pcard__img" src={`${import.meta.env.BASE_URL}obj/${o.img}`} alt="" loading="lazy" />
+            <span className="pcard__shade" aria-hidden />
+            <span className="pcard__check">
               <Check size={12} strokeWidth={3.2} />
             </span>
-
             <span className="pcard__price tnum">
-              {a.rate}% <i>{t(ui.perYear)}</i>
+              {o.rate}% <i>{t(ui.perYear)}</i>
             </span>
-
             <span className="pcard__fund tnum">
               <TrendingUp size={11} strokeWidth={2.6} />
-              {Math.round((a.raised / a.target) * 100)}%
+              {Math.round((o.raised / o.target) * 100)}%
             </span>
-
-            <span className="pcard__n">{a.name[lang]}</span>
+            <span className="pcard__n">{o.name[lang]}</span>
             <span className="pcard__loc">
               <MapPin size={11} strokeWidth={2.4} />
-              {a.city[lang]} · {a.term[lang]}
+              {o.city[lang]} · {o.term[lang]}
             </span>
+            <span className="pcard__min tnum">{money(o.min)}</span>
           </motion.button>
         ))}
       </div>
 
-      {list.length === 0 && (
-        <div className="cat__empty">
-          <b>{t(ui.tabMarket)}</b>
-          <span>{t(ui.zero)}</span>
-        </div>
-      )}
-
-      <div className="demo">{t(ui.demoNames)}</div>
+      <p className="demo">{t(ui.rateNotGuaranteed)}</p>
     </div>
   );
 }
 
-/** Строка-ссылка «Перейти в каталог» — используется на главной и в профиле. */
-export function CatalogLink({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button className="linkbtn" onClick={onClick} type="button">
-      {children}
-    </button>
-  );
-}
+export type { ObjectItem };

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronUp } from "lucide-react";
 import { MarkEsmar } from "./Logo";
@@ -6,29 +6,31 @@ import { money, useT } from "../lib/app";
 import { ui } from "../lib/data";
 
 /**
- * «Динамический остров» вместо шапки: чёрная капсула с личным счётом,
- * по тапу раскрывается в карточку счёта. Анимация — тот же приём, что в
- * веб-клонах Dynamic Island на framer-motion (nithinpjohn/Dynamic-island-notifications,
- * Kurniakun17/dynamic-island-clone): плавный переход ширины/высоты/радиуса
- * пружиной + кроссфейд содержимого через AnimatePresence.
+ * «Динамический остров» вместо шапки: капсула с личным счётом и балансом.
+ * Анимация — приём веб-клонов Dynamic Island на framer-motion: пружина на
+ * ширину/высоту/радиус + кроссфейд содержимого.
  */
 export function AccountIsland({
   user,
-  cash,
+  balance,
   onTopUp,
   onWithdraw,
-  onKyc,
+  onLogin,
 }: {
   user: boolean;
-  cash: number;
+  balance: number;
   onTopUp: () => void;
   onWithdraw: () => void;
-  onKyc: () => void;
+  onLogin: () => void;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
 
-  /* Ширина раскрытого острова подстраивается под узкие экраны. */
+  /* после входа остров закрываем — иначе он остаётся раскрытым и мешает */
+  useEffect(() => {
+    if (user) setOpen(false);
+  }, [user]);
+
   const wide = Math.min(322, window.innerWidth - 36);
 
   return (
@@ -46,11 +48,7 @@ export function AccountIsland({
           setOpen((v) => !v);
         }
       }}
-      animate={{
-        width: open ? wide : 216,
-        height: open ? "auto" : 40,
-        borderRadius: open ? 28 : 999,
-      }}
+      animate={{ width: open ? wide : 216, height: open ? "auto" : 40, borderRadius: open ? 28 : 999 }}
       transition={{ type: "spring", stiffness: 420, damping: 34, mass: 0.9 }}
     >
       <motion.div className="island__row" layout="position">
@@ -64,7 +62,7 @@ export function AccountIsland({
           animate={{ opacity: open ? 0 : 1 }}
           transition={{ duration: 0.16 }}
         >
-          {user ? money(cash) : "—"}
+          {user ? money(balance) : "—"}
         </motion.span>
       </motion.div>
 
@@ -79,63 +77,34 @@ export function AccountIsland({
             transition={{ duration: 0.18, delay: open ? 0.06 : 0 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="island__head" data-solo={!user}>
-              {user && <span className="island__acc">•••• 9047</span>}
-              <button
-                className="island__chev"
-                type="button"
-                aria-label={t(ui.collapse)}
-                onClick={() => setOpen(false)}
-              >
-                <ChevronUp size={14} strokeWidth={2.2} />
-              </button>
-            </div>
-
             {user ? (
               <>
-                <div className="island__big tnum">{money(cash, 2)}</div>
+                <div className="island__head">
+                  <span className="island__acc">•••• 9047</span>
+                  <span className="island__chev">
+                    <ChevronUp size={13} strokeWidth={2.4} />
+                  </span>
+                </div>
+                <div className="island__big tnum">{money(balance, 2)}</div>
                 <div className="island__sub">{t(ui.free)}</div>
                 <div className="island__btns">
-                  <button
-                    className="island__btn"
-                    data-p="true"
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      onTopUp();
-                    }}
-                  >
+                  <button className="island__btn island__btn--p" onClick={onTopUp} type="button">
                     {t(ui.topUp)}
                   </button>
-                  <button
-                    className="island__btn"
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      onWithdraw();
-                    }}
-                  >
+                  <button className="island__btn" onClick={onWithdraw} type="button">
                     {t(ui.withdraw)}
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <div className="island__big island__big--s">{t(ui.islandGuest)}</div>
-                <div className="island__sub">{t(ui.islandGuestSub)}</div>
-                <div className="island__btns">
-                  <button
-                    className="island__btn"
-                    data-p="true"
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      onKyc();
-                    }}
-                  >
-                    {t(ui.kycStart)}
-                  </button>
+                <div className="island__guest">
+                  <b>{t(ui.islandGuest)}</b>
+                  <span>{t(ui.islandGuestSub)}</span>
                 </div>
+                <button className="island__btn island__btn--p" onClick={onLogin} type="button">
+                  {t(ui.signIn)}
+                </button>
               </>
             )}
           </motion.div>

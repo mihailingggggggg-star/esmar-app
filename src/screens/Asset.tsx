@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
   Building2,
   CalendarDays,
   ChevronDown,
@@ -11,63 +10,54 @@ import {
   Heart,
   MapPin,
   Share2,
-  Star,
+  ShieldAlert,
   Wallet,
 } from "lucide-react";
-import { assetById, COMPANY, stages, ui } from "../lib/data";
-import { contractValue, money, useApp, useT } from "../lib/app";
+import { api } from "../api/client";
+import { useQuery } from "../api/hooks";
+import { fixed, money, useApp, useT } from "../lib/app";
+import { COMPANY, stages as stageList, ui } from "../lib/data";
+import { ErrorState, Loading } from "../components/kit";
 
 /**
- * Карточка объекта 1:1 по референсу: галерея на весь верх со счётчиком кадров,
- * круглая кнопка «назад» и поделиться/избранное, белый лист со скруглением,
- * заголовок + ставка, четыре факта с иконками, цена и кнопка, «Об объекте»
- * с раскрытием, этапы проекта чипами и нижняя панель с итогом и CTA.
+ * Карточка объекта: галерея, расчётная ставка на сегодня, срок, этапы, риски,
+ * документы и липкая панель с действиями. Для Партнёрства вместо вложения —
+ * заявка менеджеру (расчётов в приложении нет).
  */
 export function Asset({
   id,
   onBack,
-  onBuy,
-  onTerminate,
+  onInvest,
+  onEarlyExit,
+  onManager,
 }: {
   id: string;
   onBack: () => void;
-  onBuy: () => void;
-  onTerminate: () => void;
+  onInvest: () => void;
+  onEarlyExit: (strategyId: string) => void;
+  onManager: () => void;
 }) {
-  const a = assetById(id);
   const t = useT();
-  const { lang, contracts } = useApp();
+  const { lang, session } = useApp();
   const [full, setFull] = useState(false);
   const [idx, setIdx] = useState(0);
-  const [fav, setFav] = useState(() => {
-    try {
-      return (JSON.parse(localStorage.getItem("esmar-favs") || "[]") as string[]).includes(id);
-    } catch {
-      return false;
-    }
-  });
+  const [fav, setFav] = useState(false);
   const gal = useRef<HTMLDivElement>(null);
 
-  const now = new Date();
-  const mine = contracts.filter((c) => c.assetId === a.id);
-  const funded = Math.round((a.raised / a.target) * 100);
-  const cur = Math.min(Math.max(a.stage - 1, 0), stages.length - 1);
-  const consultOnly = a.product === "partnership";
+  const objectQ = useQuery(() => api.getObject(id), [id]);
+  const portfolioQ = useQuery(() => api.getPortfolio(), [session?.phone]);
+  const docQ = useQuery(() => api.getDocuments(), [session?.phone]);
 
-  /**
-   * На сайте у объекта одна фотография. Чтобы галерею можно было листать,
-   * к ней добавляются крупные фрагменты того же кадра (разный зум и точка
-   * кадрирования) — когда появятся настоящие снимки, достаточно положить их
-   * в photos[] у объекта.
-   */
+  const a = objectQ.data;
+  const mine = useMemo(
+    () => (portfolioQ.data?.strategies ?? []).filter((s) => s.objectId === id),
+    [portfolioQ.data, id]
+  );
+
   const slides = useMemo(() => {
+    if (!a) return [];
     const list = a.photos?.length ? a.photos : [a.img];
-    if (list.length > 1) return list.map((src) => ({ src, pos: "50% 50%", scale: 1 }));
-    return [
-      { src: list[0], pos: "50% 50%", scale: 1 },
-      { src: list[0], pos: "32% 78%", scale: 1.6 },
-      { src: list[0], pos: "72% 74%", scale: 1.95 },
-    ];
+    return list.map((src) => ({ src, pos: "50% 50%", scale: 1 }));
   }, [a]);
 
   const onGalScroll = () => {
@@ -77,49 +67,37 @@ export function Asset({
   };
 
   const share = async () => {
-    const url = `${COMPANY.site}/katalog`;
-    const data = { title: a.name[lang], text: `${a.name[lang]} — ESMAR`, url };
+    const url = `${COMPANY.site}/katalog/${id}`;
     try {
-      if (navigator.share) await navigator.share(data);
+      if (navigator.share) await navigator.share({ title: a ? t(a.name) : "ESMAR", url });
       else await navigator.clipboard.writeText(url);
     } catch {
-      /* пользователь закрыл шит — ничего не делаем */
+      /* пользователь отменил */
     }
   };
 
-  const toggleFav = () => {
-    setFav((v) => {
-      const next = !v;
-      try {
-        const cur = JSON.parse(localStorage.getItem("esmar-favs") || "[]") as string[];
-        const list = next ? [...new Set([...cur, a.id])] : cur.filter((x) => x !== a.id);
-        localStorage.setItem("esmar-favs", JSON.stringify(list));
-      } catch {
-        /* приватный режим */
-      }
-      return next;
-    });
-  };
+  if (objectQ.loading) return <div className="screen"><Loading /></div>;
+  if (objectQ.error || !a) return <div className="screen"><ErrorState error={objectQ.error ?? { code: "network", name: "ApiError", message: "" } as never} onRetry={objectQ.reload} /></div>;
+
+  const funded = Math.round((a.raised / a.target) * 100);
+  const cur = Math.min(Math.max(a.stage - 1, 0), stageList.length - 1);
+  const consultOnly = a.product === "partnership";
+  const docs = (docQ.data ?? []).filter((d) => d.kind === "act" || d.kind === "appendix").slice(0, 3);
 
   return (
     <motion.div
       className="det"
-      initial={{ x: "100%" }}
-      animate={{ x: 0 }}
-      exit={{ x: "100%" }}
-      transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
     >
       <div className="dt__scroll">
         <div className="dt__hero">
           <div className="dt__gal" ref={gal} onScroll={onGalScroll}>
             {slides.map((s, i) => (
               <div className="dt__slide" key={i}>
-                <img
-                  src={`${import.meta.env.BASE_URL}obj/${s.src}`}
-                  alt={`${a.name[lang]} — ${i + 1}`}
-                  style={{ objectPosition: s.pos, transform: `scale(${s.scale})` }}
-                  draggable={false}
-                />
+                <img src={`${import.meta.env.BASE_URL}obj/${s.src}`} alt="" style={{ objectPosition: s.pos }} />
               </div>
             ))}
           </div>
@@ -130,40 +108,41 @@ export function Asset({
             </button>
             <div className="dt__acts">
               <button className="dt__round" onClick={share} type="button" aria-label={t(ui.shareAction)}>
-                <Share2 size={17} strokeWidth={2.1} />
+                <Share2 size={17} strokeWidth={2.2} />
               </button>
               <button
                 className="dt__round"
+                onClick={() => setFav((v) => !v)}
                 data-on={fav}
-                onClick={toggleFav}
                 type="button"
-                aria-pressed={fav}
                 aria-label={t(ui.favorite)}
               >
-                <Heart size={17} strokeWidth={2.1} fill={fav ? "currentColor" : "none"} />
+                <Heart size={17} strokeWidth={2.2} fill={fav ? "currentColor" : "none"} />
               </button>
             </div>
           </div>
 
-          <span className="dt__count tnum">
-            {idx + 1}/{slides.length}
-          </span>
+          {slides.length > 1 && (
+            <span className="dt__count tnum">
+              {idx + 1}/{slides.length}
+            </span>
+          )}
         </div>
 
         <div className="dt__sheet">
           <div className="dt__title">
             <div>
-              <h1>{a.name[lang]}</h1>
+              <h2>{t(a.name)}</h2>
               <span className="dt__loc">
-                <MapPin size={12} strokeWidth={2.4} />
-                {a.city[lang]}, {a.address[lang]}
+                <MapPin size={13} strokeWidth={2.2} />
+                {t(a.city)}, {t(a.address)}
               </span>
             </div>
             <div className="dt__rate">
-              <b className="tnum">
-                {a.rate}% <Star size={11} strokeWidth={2.4} fill="currentColor" />
-              </b>
-              <span>{t(ui.perYear)}</span>
+              <b className="tnum">{fixed(a.rate, a.rate % 1 ? 2 : 0)}%</b>
+              <span>
+                {t(ui.targetRate)} · {t(ui.perYear)}
+              </span>
             </div>
           </div>
 
@@ -196,46 +175,53 @@ export function Asset({
               <b className="tnum">{money(a.min)}</b>
             </div>
             {consultOnly ? (
-              <a
-                className="dt__cta"
-                href={`https://wa.me/${COMPANY.whatsapp}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {t(ui.manager)}
-              </a>
+              <button className="dt__cta" onClick={onManager} type="button">
+                {t(ui.requestToManager)}
+              </button>
             ) : (
-              <button className="dt__cta" onClick={onBuy} type="button">
-                {t(ui.buy)}
+              <button className="dt__cta" onClick={onInvest} type="button">
+                {t(ui.invest)}
               </button>
             )}
           </div>
 
+          {!consultOnly && <p className="dt__fine">{t(ui.rateNotGuaranteed)}</p>}
+
           <h2 className="dt__h2">{t(ui.aboutProperty)}</h2>
           <p className="dt__about" data-full={full}>
-            {a.about[lang]}
+            {t(a.about)}
           </p>
           <button className="dt__more" onClick={() => setFull((v) => !v)} type="button">
             {full ? t(ui.collapse) : t(ui.readMore)}
             <ChevronDown size={14} strokeWidth={2.4} data-full={full} />
           </button>
 
-          <h2 className="dt__h2">{t(ui.buildProgress)}</h2>
-          <div className="dt__chips">
-            {stages.map((s, i) => (
-              <span className="dt__chip" data-on={i === cur} data-done={i < cur} key={i}>
-                <b>{i + 1}</b>
-                {s[lang]}
-              </span>
-            ))}
+          <h2 className="dt__h2">{t(ui.risks)}</h2>
+          <div className="dt__risk">
+            <ShieldAlert size={17} strokeWidth={2} />
+            <p>{t(a.risks)}</p>
           </div>
-          <div className="dt__chips dt__chips--info">
-            <span className="dt__chip dt__chip--info">{a.handover[lang]}</span>
-            <span className="dt__chip dt__chip--info tnum">
-              {funded}% {t(ui.collected)}
-            </span>
-            <span className="dt__chip dt__chip--info tnum">{money(a.target)}</span>
-          </div>
+
+          {a.product === "development" && (
+            <>
+              <h2 className="dt__h2">{t(ui.buildProgress)}</h2>
+              <div className="dt__chips">
+                {stageList.map((s, i) => (
+                  <span className="dt__chip" data-on={i === cur} data-done={i < cur} key={i}>
+                    <b>{i + 1}</b>
+                    {t(s)}
+                  </span>
+                ))}
+              </div>
+              <div className="dt__chips dt__chips--info">
+                <span className="dt__chip dt__chip--info">{t(a.handover)}</span>
+                <span className="dt__chip dt__chip--info tnum">
+                  {funded}% {t(ui.collected)}
+                </span>
+                <span className="dt__chip dt__chip--info tnum">{money(a.target)}</span>
+              </div>
+            </>
+          )}
 
           <div className="dt__fund">
             <div className="dt__fund-h">
@@ -249,19 +235,23 @@ export function Asset({
               <span className="tnum">
                 {money(a.raised)} / {money(a.target)}
               </span>
-              <span>{a.handover[lang]}</span>
+              <span>{t(a.handover)}</span>
             </div>
           </div>
 
-          <a
-            className="dt__doc"
-            href={`${COMPANY.site}/dokumenty`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t(ui.documents)}
-            <ArrowUpRight size={14} strokeWidth={2.2} />
-          </a>
+          {docs.length > 0 && (
+            <>
+              <h2 className="dt__h2">{t(ui.documents)}</h2>
+              <div className="dt__docs">
+                {docs.map((d) => (
+                  <a key={d.id} className="dt__doc" href={d.fileUrl} target="_blank" rel="noreferrer">
+                    {t(d.title)}
+                    <ArrowRight size={14} strokeWidth={2.2} />
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
 
           <p className="demo">{t(ui.demoNames)}</p>
         </div>
@@ -269,32 +259,25 @@ export function Asset({
 
       <div className="dt__bar">
         <div className="dt__bar-l">
-          <span>{mine.length ? t(ui.portfolio) : t(ui.minTicket)}</span>
+          <span>{mine.length ? t(ui.paidFact) : t(ui.minTicket)}</span>
           <b className="tnum">
-            {mine.length
-              ? money(Math.round(mine.reduce((s, c) => s + contractValue(c, now), 0)))
-              : money(a.min)}
+            {mine.length ? money(mine.reduce((s, x) => s + x.paid, 0)) : money(a.min)}
           </b>
         </div>
         <div className="dt__bar-r">
           {mine.length > 0 && (
-            <button className="dt__ghost" onClick={onTerminate} type="button">
-              {t(ui.terminate)}
+            <button className="dt__ghost" onClick={() => onEarlyExit(mine[0].id)} type="button">
+              {t(ui.earlyExit)}
             </button>
           )}
           {consultOnly ? (
-            <a
-              className="dt__cta dt__cta--bar"
-              href={`https://wa.me/${COMPANY.whatsapp}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t(ui.manager)}
+            <button className="dt__cta dt__cta--bar" onClick={onManager} type="button">
+              {t(ui.requestToManager)}
               <ArrowRight size={15} strokeWidth={2.4} />
-            </a>
+            </button>
           ) : (
-            <button className="dt__cta dt__cta--bar" onClick={onBuy} type="button">
-              {t(ui.buy)}
+            <button className="dt__cta dt__cta--bar" onClick={onInvest} type="button">
+              {t(ui.invest)}
               <ArrowRight size={15} strokeWidth={2.4} />
             </button>
           )}

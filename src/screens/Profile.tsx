@@ -1,353 +1,304 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Bell,
-  Boxes,
-  CalendarDays,
-  ChevronDown,
+  ArrowLeft,
+  Building2,
   ChevronRight,
-  Coins,
+  CreditCard,
+  FileText,
+  Globe,
+  Landmark,
+  ListChecks,
   LogOut,
-  MoreVertical,
   Plus,
   Settings,
   ShieldCheck,
   Sprout,
-  TrendingUp,
-  X,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { api } from "../api/client";
+import { useQuery } from "../api/hooks";
+import { daysWord, fixed, money, useApp, useT } from "../lib/app";
 import { COMPANY, ui } from "../lib/data";
-import {
-  accrued,
-  contractsUnit,
-  daysWord,
-  fixed,
-  money,
-  monthlyPayout,
-  nextPayoutDate,
-  parseDate,
-  useApp,
-  useT,
-} from "../lib/app";
 import { Seg } from "../components/Seg";
-import { IcChat, IcDoc, IcGlobe, IcMoon, IcOut, IcShield, IcSun } from "../components/Icons";
+import { Loading } from "../components/kit";
 
 /**
- * Личный кабинет 1:1 по референсу: пилюли сверху, строка инструментов и баланса,
- * аватар в пунктирном кольце, имя и @ник, три метрики с разделителями,
- * недельная полоса с выделенным сегодня, пара карточек и широкая карточка.
- * Иконки — lucide-react, появление — framer-motion.
+ * Личный кабинет: данные клиента, статус проверки, менеджер, банковские счета
+ * для вывода, автовывод по «Ренте», документы и заявки, реквизиты компании.
  */
 export function Profile({
-  onKyc,
-  onDemo,
+  onVerification,
   onTopUp,
   onFeed,
   onBrowse,
   onBack,
+  onDocuments,
+  onRequests,
+  onSignIn,
 }: {
-  onKyc: () => void;
-  onDemo: () => void;
+  onVerification: () => void;
   onTopUp: () => void;
   onFeed: () => void;
   onBrowse: () => void;
   onBack: () => void;
+  onDocuments: () => void;
+  onRequests: () => void;
+  onSignIn: () => void;
 }) {
   const t = useT();
-  const { lang, setLang, theme, setTheme, user, contracts, cash, signOut } = useApp();
-  const now = new Date();
+  const { lang, setLang, theme, setTheme, session, profile, setProfile, signOut, bump } = useApp();
+  const [busy, setBusy] = useState(false);
 
-  const body = contracts.reduce((s, c) => s + c.amount, 0);
-  const acc = contracts.reduce((s, c) => s + accrued(c, now), 0);
-  const total = body + acc + cash;
-  /* «Доходность» — средневзвешенная ставка по договорам, как в аналитике:
-     одна и та же метрика не должна показывать разные числа на разных экранах. */
-  const yieldPct = body ? contracts.reduce((s, c) => s + c.rate * c.amount, 0) / body : 0;
+  const analyticsQ = useQuery(() => api.getAnalytics(), [session?.phone]);
+  const accountQ = useQuery(() => api.getAccount(), [session?.phone]);
+  const strategiesQ = useQuery(() => api.getStrategies(), [session?.phone]);
 
-  const initials = user
-    ? user.name
-        .split(" ")
-        .filter(Boolean)
-        .map((w) => w[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "";
-  const handle = user ? "@" + (user.email.split("@")[0] || "esmar") : "@esmar";
-
-  const firstOpened = contracts.length
-    ? contracts.map((c) => parseDate(c.opened).getTime()).sort((a, b) => a - b)[0]
+  const a = analyticsQ.data;
+  const strategies = strategiesQ.data ?? [];
+  const first = strategies.length
+    ? strategies.map((s) => new Date(`${s.startDate}T00:00:00`).getTime()).sort((x, y) => x - y)[0]
     : null;
-  const daysIn = firstOpened ? Math.max(1, Math.floor((now.getTime() - firstOpened) / 86_400_000) + 1) : 0;
+  const daysIn = first ? Math.max(1, Math.floor((Date.now() - first) / 86_400_000) + 1) : 0;
 
-  /* Ближайшая арендная выплата: дата и сумма по самому раннему договору. */
-  const rent = contracts.filter((c) => c.product === "rent");
-  const next = useMemo(() => {
-    if (!rent.length) return null;
-    const sorted = [...rent].sort(
-      (a, b) => nextPayoutDate(a, now).getTime() - nextPayoutDate(b, now).getTime()
+  const toggleAuto = async () => {
+    if (!profile) return;
+    setBusy(true);
+    try {
+      const next = await api.patchMe({ autoWithdrawRent: !profile.autoWithdrawRent });
+      setProfile({ ...profile, ...next });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addAccount = async () => {
+    if (!profile) return;
+    setBusy(true);
+    try {
+      await api.addBankAccount({
+        bank: { ru: "Банк клиента", ky: "Кардардын банкы" },
+        masked: "•••• 0000",
+        currency: "USD",
+        owner: profile.name,
+      });
+      bump();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!session) {
+    return (
+      <div className="screen">
+        <header className="pf__bar">
+          <button className="pf__pill" onClick={onBack} type="button">
+            <ArrowLeft size={15} strokeWidth={2.4} /> {t(ui.close)}
+          </button>
+        </header>
+        <div className="pf__guest">
+          <span className="pf__ring">
+            <ShieldCheck size={26} strokeWidth={1.8} />
+          </span>
+          <h1>{t(ui.pfGuest)}</h1>
+          <p>{t(ui.kycWhyShort)}</p>
+          <button className="btn btn--p" onClick={onSignIn} type="button">
+            {t(ui.signIn)}
+          </button>
+          <button className="btn btn--s" onClick={onBrowse} type="button">
+            {t(ui.tabMarket)}
+          </button>
+        </div>
+      </div>
     );
-    const c = sorted[0];
-    const date = nextPayoutDate(c, now);
-    return {
-      date,
-      amount: monthlyPayout(c),
-      days: Math.max(1, Math.ceil((date.getTime() - now.getTime()) / 86_400_000)),
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts]);
-
-  /* Неделя: понедельник — воскресенье, сегодня выделено. */
-  const week = useMemo(() => {
-    const shift = (now.getDay() + 6) % 7;
-    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - shift);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
-      return {
-        wd: d.toLocaleDateString("ru-RU", { weekday: "short" }).slice(0, 2),
-        day: d.getDate(),
-        today:
-          d.getDate() === now.getDate() &&
-          d.getMonth() === now.getMonth() &&
-          d.getFullYear() === now.getFullYear(),
-      };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* Точки-«стрик»: чем ближе выплата, тем больше зажжённых. */
-  const lit = next ? Math.min(7, Math.max(1, 7 - Math.ceil(next.days / 7))) : 0;
+  }
 
   return (
-    <div className="screen">
+    <motion.div className="screen" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <header className="pf__bar">
         <button className="pf__pill" onClick={onBack} type="button">
-          <X size={14} strokeWidth={2.6} />
-          {t(ui.close)}
+          <ArrowLeft size={15} strokeWidth={2.4} /> {t(ui.close)}
         </button>
-        <button className="pf__pill pf__pill--icons" onClick={onDemo} type="button" aria-label={t(ui.settings)}>
-          <ChevronDown size={16} strokeWidth={2.2} />
-          <MoreVertical size={16} strokeWidth={2.2} />
+        <button className="pf__pill pf__pill--icons" onClick={onFeed} type="button" aria-label={t(ui.history)}>
+          <ListChecks size={15} strokeWidth={2.2} />
         </button>
       </header>
 
       <div className="pf__tools">
-        <button className="pf__tool" onClick={onDemo} type="button" aria-label={t(ui.settings)}>
-          <Settings size={19} strokeWidth={2} />
+        <button className="pf__tool" onClick={() => setTheme(theme === "light" ? "dark" : "light")} type="button" aria-label={t(ui.theme)}>
+          {theme === "light" ? <Sun size={17} strokeWidth={2} /> : <Moon size={17} strokeWidth={2} />}
         </button>
-        <button className="pf__tool pf__tool--dot" onClick={onFeed} type="button" aria-label={t(ui.history)}>
-          <Bell size={19} strokeWidth={2} />
+        <button className="pf__tool" onClick={onVerification} type="button" aria-label={t(ui.kycTitle)}>
+          <Settings size={17} strokeWidth={2} />
         </button>
-
         <span className="pf__money">
-          <Coins size={15} strokeWidth={2.2} />
-          <b className="tnum">{money(Math.round(total))}</b>
+          <span className="pf__money-i">
+            <CreditCard size={15} strokeWidth={2.2} />
+          </span>
+          <b className="tnum">{money(accountQ.data?.balance ?? 0)}</b>
           <button className="pf__add" onClick={onTopUp} type="button" aria-label={t(ui.topUp)}>
             <Plus size={17} strokeWidth={2.6} />
           </button>
         </span>
       </div>
 
-      <motion.div
-        className="pf__ava"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: "spring", stiffness: 260, damping: 22 }}
-      >
+      <span className="pf__ava">
         <span className="pf__ring">
-          {user ? initials : <ShieldCheck size={26} strokeWidth={1.8} />}
+          {profile?.name
+            .split(" ")
+            .filter(Boolean)
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 2)}
         </span>
-      </motion.div>
+      </span>
+      <h1 className="pf__name">{profile?.name}</h1>
+      <span className="pf__handle">{profile?.phone}</span>
 
-      <h1 className="pf__name">{user ? user.name : t(ui.pfGuest)}</h1>
-      <span className="pf__handle">{handle}</span>
+      <button className="pf__kyc" data-kyc={profile?.kyc ?? "none"} onClick={onVerification} type="button">
+        <ShieldCheck size={15} strokeWidth={2.2} />
+        {profile?.kyc === "verified" ? t(ui.kycVerified) : profile?.kyc === "pending" ? t(ui.kycPending) : t(ui.kycNone)}
+        <ChevronRight size={14} strokeWidth={2.2} />
+      </button>
 
-      {user ? (
-        <div className="pf__stats">
-          <div>
-            <span className="pf__si">
-              <TrendingUp size={15} strokeWidth={2.4} />
-            </span>
-            <b className="tnum">{fixed(yieldPct)}%</b>
-            <span>{t(ui.pfYield)}</span>
-          </div>
-          <div>
-            <span className="pf__si">
-              <Boxes size={15} strokeWidth={2.2} />
-            </span>
-            <b className="tnum">{contracts.length}</b>
-            <span>{contractsUnit(contracts.length, lang)}</span>
-          </div>
-          <div>
-            <span className="pf__si">
-              <CalendarDays size={15} strokeWidth={2.2} />
-            </span>
-            <b className="tnum">{daysIn}</b>
-            <span>
-              {daysWord(daysIn)} {t(ui.pfDaysIn)}
-            </span>
-          </div>
+      <div className="pf__stats">
+        <div>
+          <span className="pf__si">
+            <Sprout size={15} strokeWidth={2.2} />
+          </span>
+          <b className="tnum">{a ? `${fixed(a.avgRate)}%` : "—"}</b>
+          <span>{t(ui.pfYield)}</span>
         </div>
-      ) : (
-        <button className="pf__cta" onClick={onKyc} type="button">
-          <ShieldCheck size={18} strokeWidth={2} />
-          {t(ui.guestCta)}
-        </button>
-      )}
-
-      <div className="pf__week">
-        {week.map((d) => (
-          <div className="pf__day" data-on={d.today} key={d.day} aria-current={d.today ? "date" : undefined}>
-            <i aria-hidden />
-            <span>{d.wd}</span>
-            <b className="tnum">{d.day}</b>
-          </div>
-        ))}
+        <div>
+          <span className="pf__si">
+            <Building2 size={15} strokeWidth={2.2} />
+          </span>
+          <b className="tnum">{strategies.length}</b>
+          <span>{t(ui.pfContractsLabel)}</span>
+        </div>
+        <div>
+          <span className="pf__si">
+            <FileText size={15} strokeWidth={2.2} />
+          </span>
+          <b className="tnum">{daysIn}</b>
+          <span>
+            {daysWord(daysIn)} {t(ui.pfDaysIn)}
+          </span>
+        </div>
       </div>
 
       <div className="pf__duo">
-        <a className="pf__card" href={`https://wa.me/${COMPANY.whatsapp}`} target="_blank" rel="noreferrer">
+        <div className="pf__card">
           <span className="pf__face" aria-hidden>
             <Sprout size={17} strokeWidth={2.2} />
             <i className="pf__on" />
           </span>
           <b>{t(ui.manager)}</b>
-          <span className="pf__sub">{t(ui.pfOnline)}</span>
-        </a>
+          <span className="pf__sub">{profile?.manager.name}</span>
+          <a className="pf__link" href={`https://wa.me/${COMPANY.whatsapp}`} target="_blank" rel="noreferrer">
+            WhatsApp
+          </a>
+        </div>
 
-        <div className="pf__card pf__card--next">
+        <div className="pf__card">
           <span className="pf__cardico" aria-hidden>
-            <CalendarDays size={17} strokeWidth={2} />
+            <Landmark size={17} strokeWidth={2} />
           </span>
-          <b>{t(ui.pfNext)}</b>
-          <span className="pf__sub tnum">
-            {next
-              ? `${money(Math.round(next.amount))} · ${t(ui.pfIn)} ${next.days} ${t(ui.pfDaysShort)}`
-              : "—"}
-          </span>
-          <span className="pf__dots" aria-hidden>
-            {Array.from({ length: 7 }, (_, i) => (
-              <i key={i} data-on={i < lit} />
+          <b>{t(ui.bankAccounts)}</b>
+          <div className="pf__accs">
+            {(profile?.bankAccounts ?? []).map((b) => (
+              <span key={b.id} className="pf__acc" data-status={b.status}>
+                {t(b.bank)} · {b.masked}
+                {b.status === "pending" && <i>{t(ui.accountPending)}</i>}
+              </span>
             ))}
-          </span>
+          </div>
+          <button className="pf__addacc" onClick={addAccount} disabled={busy} type="button">
+            <Plus size={13} strokeWidth={2.6} /> {t(ui.addAccount)}
+          </button>
         </div>
       </div>
 
-      <button className="pf__wide" onClick={onBrowse} type="button">
-        <span className="pf__wide-i">
-          <Plus size={19} strokeWidth={2.4} />
-        </span>
+      <div className="pf__switch">
         <span>
-          <b>
-            {cash > 0 ? `${money(cash)} ${t(ui.pfFreeShort)}` : t(ui.pfTopUp)}
-          </b>
-          <span>{cash > 0 ? t(ui.pfFreeSub) : t(ui.pfNoFunds)}</span>
+          <b>{t(ui.autoWithdraw)}</b>
+          <i>{t(ui.autoWithdrawHint)}</i>
         </span>
-        <ChevronRight size={18} strokeWidth={2.2} />
-      </button>
+        <button
+          className="switch"
+          data-on={profile?.autoWithdrawRent}
+          onClick={toggleAuto}
+          disabled={busy}
+          type="button"
+          role="switch"
+          aria-checked={profile?.autoWithdrawRent}
+          aria-label={t(ui.autoWithdraw)}
+        >
+          <span />
+        </button>
+      </div>
 
       <div className="pf__list">
-        <div className="pf__row">
+        <button className="pf__row" onClick={onDocuments} type="button">
           <span className="pf__row-i">
-            <IcGlobe />
+            <FileText size={16} strokeWidth={2} />
           </span>
-          <span className="pf__row-b">
-            <b>{t(ui.language)}</b>
-            <span>{lang === "ky" ? "Кыргызча" : "Русский"}</span>
-          </span>
-          <Seg
-            name="lang"
-            value={lang}
-            onChange={setLang}
-            options={[
-              { v: "ky" as const, label: "KG" },
-              { v: "ru" as const, label: "RU" },
-            ]}
-          />
-        </div>
-
-        <div className="pf__row">
-          <span className="pf__row-i">{theme === "dark" ? <IcMoon /> : <IcSun />}</span>
-          <span className="pf__row-b">
-            <b>{t(ui.theme)}</b>
-            <span>{theme === "dark" ? t(ui.themeDark) : t(ui.themeLight)}</span>
-          </span>
-          <Seg
-            name="theme"
-            value={theme}
-            onChange={setTheme}
-            options={[
-              { v: "dark" as const, label: <IcMoon /> },
-              { v: "light" as const, label: <IcSun /> },
-            ]}
-          />
-        </div>
-
-        <div className="pf__row">
+          {t(ui.documents)}
+          <ChevronRight size={16} strokeWidth={2.2} />
+        </button>
+        <button className="pf__row" onClick={onRequests} type="button">
           <span className="pf__row-i">
-            <IcShield />
+            <ListChecks size={16} strokeWidth={2} />
           </span>
-          <span className="pf__row-b">
-            <b>
-              {t(ui.license)} {COMPANY.license.no}
-            </b>
-            <span>Финнадзор КР · {COMPANY.license.date}</span>
-          </span>
-        </div>
-
-        <a
-          className="pf__row"
-          href={`${COMPANY.site}/dokumenty`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          <span className="pf__row-i">
-            <IcDoc />
-          </span>
-          <span className="pf__row-b">
-            <b>{t(ui.documents)}</b>
-            <span>{t(ui.docsNote)}</span>
-          </span>
-          <IcOut />
-        </a>
-
-        <button className="pf__row" onClick={onDemo} type="button">
-          <span className="pf__row-i">
-            <IcDoc />
-          </span>
-          <span className="pf__row-b">
-            <b>{t(ui.sample)}</b>
-            <span>{t(ui.offer)}</span>
-          </span>
+          {t(ui.requests)}
           <ChevronRight size={16} strokeWidth={2.2} />
         </button>
 
-        <a className="pf__row" href={`https://wa.me/${COMPANY.whatsapp}`} target="_blank" rel="noreferrer">
+        <div className="pf__row pf__row--seg">
           <span className="pf__row-i">
-            <IcChat />
+            <Globe size={16} strokeWidth={2} />
           </span>
-          <span className="pf__row-b">
-            <b>{t(ui.support)}</b>
-            <span>
-              {COMPANY.phone} · {COMPANY.email}
-            </span>
-          </span>
-          <IcOut />
-        </a>
+          <span className="pf__row-t">{t(ui.lang)}</span>
+          <Seg
+            name="lang"
+            small
+            value={lang}
+            onChange={(v) => setLang(v as "ru" | "ky")}
+            options={[
+              { v: "ru", label: "RU" },
+              { v: "ky", label: "KG" },
+            ]}
+          />
+        </div>
 
-        {user && (
-          <button className="pf__row pf__row--out" onClick={signOut} type="button">
-            <span className="pf__row-i">
-              <LogOut size={16} strokeWidth={2} />
-            </span>
-            <span className="pf__row-b">
-              <b>{t(ui.logout)}</b>
-            </span>
-          </button>
-        )}
+        <div className="pf__legal">
+          <span>{t(ui.legalAddress)}</span>
+          <b>{t(COMPANY.legalAddress)}</b>
+          <span>{t(ui.officeAddress)}</span>
+          <b>{t(COMPANY.address)}</b>
+          <span>{t(ui.licence)}</span>
+          <b>
+            {COMPANY.license.no} · {COMPANY.license.date}
+          </b>
+          <span>{COMPANY.legal}</span>
+          <b>{COMPANY.phone}</b>
+        </div>
       </div>
 
-      <p className="demo">{t(ui.demoNames)}</p>
-    </div>
+      {analyticsQ.loading && <Loading />}
+
+      <button
+        className="pf__out"
+        onClick={() => {
+          signOut();
+          onBack();
+        }}
+        type="button"
+      >
+        <LogOut size={15} strokeWidth={2.2} />
+        {t(ui.signOut)}
+      </button>
+    </motion.div>
   );
 }

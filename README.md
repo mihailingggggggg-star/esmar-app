@@ -1,4 +1,9 @@
-# ESMAR — мобильное приложение доверительного управления
+# ESMAR — мобильное приложение доверительного управления (v1)
+
+> **Версия v1.** Клиент видит полноценное приложение, а операции за кнопками
+> выполняют люди в CRM: вложение, вывод, досрочный выход и проверка личности —
+> это заявки, а не мгновенные действия. Данные приходят из API-клиента
+> (`src/api`), сейчас с моками по контракту из ТЗ.
 
 Живая версия: https://mihailingggggggg-star.github.io/esmar-app/
 
@@ -115,8 +120,6 @@ KYC — полная эмуляция в четыре шага: данные →
 | Спиннеры в загрузке и проверке | [GriffinJohnston/ldrs](https://github.com/GriffinJohnston/ldrs) | MIT |
 | Камера для документа и селфи | [mozmorris/react-webcam](https://github.com/mozmorris/react-webcam) | MIT |
 | Загрузка фото документа | [react-dropzone/react-dropzone](https://github.com/react-dropzone/react-dropzone) | MIT |
-| Сценарий подписания через уведомление | [documenso/documenso](https://github.com/documenso/documenso) | AGPL-3.0 |
-| Структура аналитики портфеля | [ghostfolio/ghostfolio](https://github.com/ghostfolio/ghostfolio) | AGPL-3.0 |
 
 Графики вынесены в отдельный чанк и грузятся при открытии аналитики,
 проверка личности — при первом нажатии «Купить».

@@ -1,13 +1,17 @@
 
-import { ArrowUpRight, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, WifiOff, Loader, Inbox, Lock, type LucideIcon } from "lucide-react";
 import {
   ArrowDownLeft,
   ArrowUpRight as PhArrowUpRight,
   ChartLineUp,
   FileText,
   HandCoins,
+  Receipt,
+  Wallet,
 } from "@phosphor-icons/react";
-import type { EventKind } from "../lib/feed";
+import type { ApiError, Operation } from "../api/types";
+import { useT } from "../lib/app";
+import { ui } from "../lib/data";
 import { MarkEsmar } from "./Logo";
 
 /**
@@ -79,31 +83,32 @@ export function ActionChip({
  * штриховые глифы. Набор готовый, своих путей не рисуем.
  */
 const TX_ICON = {
-  sign: FileText,
-  accrual: ChartLineUp,
-  payout: HandCoins,
   topup: ArrowDownLeft,
-  terminate: PhArrowUpRight,
+  invest: Wallet,
+  payout: HandCoins,
+  refund: ChartLineUp,
+  tax: Receipt,
+  withdraw: PhArrowUpRight,
+  sign: FileText,
 } as const;
 
 export function TxRow({
-  kind,
+  op,
   title,
   sub,
   amount,
-  tone,
   onClick,
 }: {
-  kind: EventKind;
+  op: Operation;
   title: string;
   sub: string;
   amount: string;
-  tone?: "up" | "down";
   onClick?: () => void;
 }) {
-  const Icon = TX_ICON[kind];
+  const Icon = TX_ICON[op.type] ?? FileText;
+  const tone = op.amount > 0 ? "up" : undefined;
   return (
-    <button className="tx" onClick={onClick} type="button">
+    <button className="tx" onClick={onClick} type="button" data-pending={op.status === "pending"}>
       <span className="tx__i" data-tone={tone}>
         <Icon size={18} weight="fill" />
       </span>
@@ -113,6 +118,50 @@ export function TxRow({
       </span>
       <span className={`tx__a tnum ${tone === "up" ? "up" : ""}`}>{amount}</span>
     </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Состояния экранов: загрузка, ошибка сети, истёкшая сессия, пусто   */
+/* ------------------------------------------------------------------ */
+
+export function Loading() {
+  const t = useT();
+  return (
+    <div className="state state--load" role="status" aria-live="polite">
+      <Loader size={20} className="spin" />
+      <span>{t(ui.loading)}</span>
+    </div>
+  );
+}
+
+export function ErrorState({ error, onRetry }: { error: ApiError; onRetry: () => void }) {
+  const t = useT();
+  const expired = error.code === "unauthorized";
+  const Icon = expired ? Lock : WifiOff;
+  return (
+    <div className="state state--err">
+      <span className="state__i">
+        <Icon size={20} strokeWidth={2} />
+      </span>
+      <b>{expired ? t(ui.sessionExpired) : t(ui.netError)}</b>
+      <span>{expired ? t(ui.sessionExpiredHint) : t(ui.netErrorHint)}</span>
+      <button className="btn btn--s btn--sm" onClick={onRetry} type="button">
+        {t(ui.retry)}
+      </button>
+    </div>
+  );
+}
+
+export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="state state--empty">
+      <span className="state__i">
+        <Inbox size={20} strokeWidth={2} />
+      </span>
+      <b>{title}</b>
+      {hint && <span>{hint}</span>}
+    </div>
   );
 }
 

@@ -1,29 +1,30 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import type { Contract, Lang } from "./lib/data";
-import { AppCtx, seedCash, seedContracts, useApp, type Theme, type User } from "./lib/app";
+import { AppCtx, useApp, type Theme } from "./lib/app";
+import type { Lang } from "./lib/data";
+import { api } from "./api/client";
+import { useQuery } from "./api/hooks";
+import type { Profile, Session } from "./api/types";
 import { Nav, type Tab } from "./components/Nav";
 import { Splash } from "./components/Splash";
 import { Home } from "./screens/Home";
 import { Market } from "./screens/Market";
-import { Profile } from "./screens/Profile";
+import { Profile as ProfileScreen } from "./screens/Profile";
 import { Asset } from "./screens/Asset";
-import { Deal, DemoStub, FeedSheet, NewsSheet, Terminate, TopUp } from "./screens/Flows";
+import { Auth } from "./screens/Auth";
+import { Verification } from "./screens/Verification";
+import { Documents } from "./screens/Documents";
+import { Requests } from "./screens/Requests";
+import { EarlyExit, FeedSheet, Invest, NewsSheet, TopUp, Withdraw } from "./screens/Flows";
 
-/* Проверка личности и аналитика тянут камеру и графики — грузим по требованию,
-   чтобы первый экран открывался быстрее. */
-const Kyc = lazy(() => import("./components/Kyc").then((m) => ({ default: m.Kyc })));
 const Stats = lazy(() => import("./screens/Stats").then((m) => ({ default: m.Stats })));
 
 const LS = {
   lang: "esmar-lang",
   theme: "esmar-theme",
-  user: "esmar-user",
-  contracts: "esmar-contracts",
-  cash: "esmar-cash",
+  session: "esmar-session",
 };
 
-/** localStorage бросает исключение в приватной вкладке — старт от этого не падает. */
 function read(key: string, allowed: string[], fallback: string) {
   try {
     const v = localStorage.getItem(key);
@@ -46,17 +47,24 @@ function write(key: string, value: unknown) {
   try {
     localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
   } catch {
-    /* приватный режим — настройка просто не переживёт перезапуск */
+    /* приватный режим — настройка не переживёт перезапуск */
   }
 }
 
+/**
+ * Корень приложения: тема, язык, сессия клиента. Данные приходят из API-клиента,
+ * поэтому экран не знает, моки это или бэкенд.
+ */
 export default function Root() {
   const [lang, setLang] = useState<Lang>(() => read(LS.lang, ["ru", "ky"], "ru") as Lang);
   const [theme, setTheme] = useState<Theme>(() => read(LS.theme, ["light", "dark"], "light") as Theme);
-  const [user, setUser] = useState<User | null>(() => readJson<User | null>(LS.user, null));
-  const [contracts, setContracts] = useState<Contract[]>(() => readJson<Contract[]>(LS.contracts, []));
-  const [cash, setCash] = useState<number>(() => readJson<number>(LS.cash, 0));
+  const [session, setSession] = useState<Session | null>(() => readJson<Session | null>(LS.session, null));
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [version, setVersion] = useState(0);
   const [booting, setBooting] = useState(true);
+
+  const productsQ = useQuery(() => api.getProducts(), []);
+  const companyQ = useQuery(() => api.getCompany(), []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -67,30 +75,30 @@ export default function Root() {
     write(LS.lang, lang);
   }, [theme, lang]);
 
-  useEffect(() => write(LS.user, user), [user]);
-  useEffect(() => write(LS.contracts, contracts), [contracts]);
-  useEffect(() => write(LS.cash, cash), [cash]);
+  useEffect(() => write(LS.session, session), [session]);
 
-  const verify = useCallback((name: string) => {
-    setUser({ name, email: "m.bandurin@demo.kg", verifiedAt: new Date().toISOString() });
-    /* Демо-портфель: в приложении-презентации инвестор уже с договорами. */
-    setContracts((prev) => (prev.length ? prev : seedContracts()));
-    setCash((prev) => (prev > 0 ? prev : seedCash()));
-  }, []);
+  useEffect(() => {
+    if (!session) {
+      setProfile(null);
+      return;
+    }
+    let alive = true;
+    api
+      .getMe()
+      .then((p) => alive && setProfile(p))
+      .catch(() => alive && setProfile(null));
+    return () => {
+      alive = false;
+    };
+  }, [session, version]);
 
+  const signIn = useCallback((s: Session) => setSession(s), []);
   const signOut = useCallback(() => {
-    setUser(null);
-    setContracts([]);
-    setCash(0);
+    api.logout();
+    setSession(null);
+    setProfile(null);
   }, []);
-
-  const addContract = useCallback((c: Contract) => {
-    setContracts((prev) => [c, ...prev]);
-  }, []);
-
-  const removeContract = useCallback((no: string) => {
-    setContracts((prev) => prev.filter((c) => c.no !== no));
-  }, []);
+  const bump = useCallback(() => setVersion((v) => v + 1), []);
 
   const ctx = useMemo(
     () => ({
@@ -98,16 +106,17 @@ export default function Root() {
       setLang,
       theme,
       setTheme,
-      user,
-      contracts,
-      cash,
-      verify,
+      session,
+      profile,
+      signIn,
       signOut,
-      addContract,
-      removeContract,
-      setCash,
+      products: productsQ.data ?? {},
+      company: companyQ.data,
+      version,
+      bump,
+      setProfile,
     }),
-    [lang, theme, user, contracts, cash, verify, signOut, addContract, removeContract]
+    [lang, theme, session, profile, signIn, signOut, productsQ.data, companyQ.data, version, bump]
   );
 
   return (
@@ -126,40 +135,58 @@ export default function Root() {
 }
 
 function Shell() {
-  const { user, contracts } = useApp();
+  const { session, profile, bump } = useApp();
   const [tab, setTab] = useState<Tab>("home");
   const [asset, setAsset] = useState<string | null>(null);
   const [topUp, setTopUp] = useState(false);
-  const [deal, setDeal] = useState<string | null>(null);
-  const [term, setTerm] = useState<string | null>(null);
-  const [kyc, setKyc] = useState(false);
+  const [invest, setInvest] = useState<string | null>(null);
+  const [exit, setExit] = useState<string | null>(null);
+  const [auth, setAuth] = useState(false);
+  const [verification, setVerification] = useState(false);
   const [newsAll, setNewsAll] = useState(false);
-  const [stub, setStub] = useState(false);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [documents, setDocuments] = useState(false);
+  const [requests, setRequests] = useState(false);
+  const [withdraw, setWithdraw] = useState(false);
 
-  /* Действие, отложенное до прохождения проверки личности. */
+  /* Действие, отложенное до входа или проверки личности. */
   const pending = useRef<null | (() => void)>(null);
+  const runPending = useCallback(() => {
+    const run = pending.current;
+    pending.current = null;
+    if (run) window.setTimeout(run, 260);
+  }, []);
 
-  /** Покупка, расторжение и пополнение требуют подтверждённой личности. */
+  /** Действия, для которых нужен вход. */
   const gate = useCallback(
     (run: () => void) => {
-      if (user) {
+      if (session) {
         run();
         return;
       }
       pending.current = run;
-      setKyc(true);
+      setAuth(true);
     },
-    [user]
+    [session]
   );
 
-  const onKycDone = useCallback(() => {
-    setKyc(false);
-    const run = pending.current;
-    pending.current = null;
-    /* Даём оверлею проверки уйти, иначе лист открывается под ним. */
-    if (run) window.setTimeout(run, 320);
-  }, []);
+  /** Вложение и вывод дополнительно требуют пройденной проверки личности. */
+  const gateVerified = useCallback(
+    (run: () => void) => {
+      if (!session) {
+        pending.current = () => gateVerified(run);
+        setAuth(true);
+        return;
+      }
+      if (profile?.kyc === "verified") {
+        run();
+        return;
+      }
+      pending.current = run;
+      setVerification(true);
+    },
+    [session, profile]
+  );
 
   return (
     <div className="app">
@@ -181,29 +208,40 @@ function Shell() {
             <Home
               onAsset={setAsset}
               onStats={() => setTab("stats")}
-              onAll={() => setFeedOpen(true)}
-              onKyc={() => setKyc(true)}
+              onAll={() => gate(() => setFeedOpen(true))}
+              onVerification={() => (session ? setVerification(true) : setAuth(true))}
               onBrowse={() => setTab("market")}
               onAllNews={() => setNewsAll(true)}
               onTopUp={() => gate(() => setTopUp(true))}
-              onWithdraw={() => gate(() => setStub(true))}
-              onBuy={(id) => gate(() => setDeal(id))}
+              onWithdraw={() => gateVerified(() => setWithdraw(true))}
+              onInvest={(id) => gateVerified(() => setInvest(id))}
+              onDocuments={() => gate(() => setDocuments(true))}
+              onRequests={() => gate(() => setRequests(true))}
+              onSignIn={() => setAuth(true)}
+              onEarlyExit={(id: string) => gateVerified(() => setExit(id))}
+              onProlong={async (id: string) => {
+                await api.createRequest({ type: "prolong", note: id });
+                bump();
+                setRequests(true);
+              }}
             />
           )}
           {tab === "market" && <Market onAsset={setAsset} onProfile={() => setTab("profile")} />}
           {tab === "stats" && (
             <Suspense fallback={<div className="screen" />}>
-              <Stats onKyc={() => setKyc(true)} onBack={() => setTab("home")} />
+              <Stats onVerification={() => setVerification(true)} onBack={() => setTab("home")} />
             </Suspense>
           )}
           {tab === "profile" && (
-            <Profile
-              onKyc={() => setKyc(true)}
-              onDemo={() => setStub(true)}
+            <ProfileScreen
+              onVerification={() => setVerification(true)}
               onTopUp={() => gate(() => setTopUp(true))}
-              onFeed={() => setFeedOpen(true)}
+              onFeed={() => gate(() => setFeedOpen(true))}
               onBrowse={() => setTab("market")}
               onBack={() => setTab("home")}
+              onDocuments={() => gate(() => setDocuments(true))}
+              onRequests={() => gate(() => setRequests(true))}
+              onSignIn={() => setAuth(true)}
             />
           )}
         </motion.div>
@@ -217,35 +255,58 @@ function Shell() {
             key={asset}
             id={asset}
             onBack={() => setAsset(null)}
-            onBuy={() => gate(() => setDeal(asset))}
-            onTerminate={() => {
-              /* Проверка личности нужна только если есть что расторгать. */
-              if (contracts.some((c) => c.assetId === asset)) gate(() => setTerm(asset));
-              else setTerm(asset);
-            }}
+            onInvest={() => gateVerified(() => setInvest(asset))}
+            onEarlyExit={(strategyId) => gateVerified(() => setExit(strategyId))}
+            onManager={() => (session ? setVerification(true) : setAuth(true))}
           />
         )}
       </AnimatePresence>
 
       <AnimatePresence>{topUp && <TopUp key="topup" onClose={() => setTopUp(false)} />}</AnimatePresence>
-      <AnimatePresence>{deal && <Deal key="deal" id={deal} onClose={() => setDeal(null)} />}</AnimatePresence>
+      <AnimatePresence>{withdraw && <Withdraw key="wd" onClose={() => setWithdraw(false)} />}</AnimatePresence>
       <AnimatePresence>
-        {term && <Terminate key="term" assetId={term} onClose={() => setTerm(null)} />}
+        {invest && <Invest key="inv" objectId={invest} onClose={() => setInvest(null)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {exit && <EarlyExit key="exit" strategyId={exit} onClose={() => setExit(null)} />}
       </AnimatePresence>
       <AnimatePresence>{newsAll && <NewsSheet key="news" onClose={() => setNewsAll(false)} />}</AnimatePresence>
       <AnimatePresence>{feedOpen && <FeedSheet key="feed" onClose={() => setFeedOpen(false)} />}</AnimatePresence>
-      <AnimatePresence>{stub && <DemoStub key="stub" onClose={() => setStub(false)} />}</AnimatePresence>
       <AnimatePresence>
-        {kyc && (
-          <Suspense key="kyc" fallback={null}>
-            <Kyc
-              onClose={() => {
-                pending.current = null;
-                setKyc(false);
-              }}
-              onDone={onKycDone}
-            />
-          </Suspense>
+        {documents && <Documents key="docs" onClose={() => setDocuments(false)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {requests && <Requests key="req" onClose={() => setRequests(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {auth && (
+          <Auth
+            key="auth"
+            onClose={() => {
+              pending.current = null;
+              setAuth(false);
+            }}
+            onDone={() => {
+              setAuth(false);
+              runPending();
+            }}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {verification && (
+          <Verification
+            key="ver"
+            onClose={() => {
+              pending.current = null;
+              setVerification(false);
+            }}
+            onBooked={() => {
+              setVerification(false);
+              runPending();
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
