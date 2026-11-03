@@ -36,7 +36,7 @@ export function Market({ onAsset, onProfile }: { onAsset: (id: string) => void; 
         (products[o.product]?.name[lang] ?? "").toLowerCase().includes(q)
       );
     });
-  }, [objects, query, openOnly, product, lang, products]);
+  }, [data, query, openOnly, product, lang, products]);
 
   return (
     <div className="screen">

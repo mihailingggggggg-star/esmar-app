@@ -162,7 +162,11 @@ export const api = {
 
   /* --- клиент --- */
   async getMe(): Promise<Profile> {
-    return call(() => mockProfile, { auth: true });
+    /* демо-переключатель статуса проверки: ?kyc=none|pending|rejected */
+    return call(() => {
+      const forced = params().get("kyc");
+      return forced ? { ...mockProfile, kyc: forced as Profile["kyc"] } : mockProfile;
+    }, { auth: true });
   },
 
   async patchMe(patch: Partial<Profile>): Promise<Profile> {
