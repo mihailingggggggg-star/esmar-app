@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fbf8f1" />
+    <meta
+      name="description"
+      content="ESMAR — доверительное управление недвижимостью Кыргызстана: целевая доходность 15–30% годовых, договор доверительного управления, лицензия Финнадзора КР №88."
+    />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="apple-touch-icon" href="./favicon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>ESMAR — доверительное управление недвижимостью</title>
+    <script type="module" crossorigin src="/esmar-app/assets/index-COribMpD.js"></script>
+    <link rel="stylesheet" crossorigin href="/esmar-app/assets/index-Di3k46Fu.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      /* Тема и язык выставляются до первой отрисовки, иначе при сохранённой
+         светлой теме экран успевает моргнуть чёрным. */
+      try {
+        var t = localStorage.getItem("esmar-theme");
+        if (t === "light" || t === "dark") {
+          document.documentElement.dataset.theme = t;
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.content = t === "light" ? "#f4f1ea" : "#0b0e06";
+        }
+        var l = localStorage.getItem("esmar-lang");
+        if (l === "ru" || l === "ky") document.documentElement.lang = l;
+      } catch (e) {}
+    </script>
+    <script>
+      /* GitHub Pages отдаёт index.html с cache-control: max-age=600, поэтому
+         после деплоя можно ещё десять минут видеть старую сборку. Сверяем хеш
+         бандла с тем, что лежит на сервере, и один раз перезагружаем страницу
+         с cache-busting query. Повторного цикла не будет: флаг в sessionStorage. */
+      (function () {
+        try {
+          var tag = document.querySelector('script[type="module"][src*="assets/"]');
+          var cur = tag && tag.getAttribute("src").match(/index-[A-Za-z0-9_-]+\.js/);
+          if (!cur) return;
+          fetch(location.pathname, { cache: "no-store" })
+            .then(function (r) {
+              return r.text();
+            })
+            .then(function (html) {
+              var m = html.match(/index-[A-Za-z0-9_-]+\.js/);
+              if (!m || m[0] === cur[0]) return;
+              var key = "esmar-build-" + m[0];
+              if (sessionStorage.getItem(key)) return;
+              sessionStorage.setItem(key, "1");
+              var url = new URL(location.href);
+              url.searchParams.set("v", m[0]);
+              location.replace(url.toString());
+            })
+            .catch(function () {});
+        } catch (e) {}
+      })();
+    </script>
+  </body>
+</html>
